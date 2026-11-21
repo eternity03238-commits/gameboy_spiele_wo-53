@@ -74,12 +74,47 @@ static void place_food(void) {
     put(fx, fy, food_tile[ftype]);
 }
 
+/* Level = Zeitalter. Zahl = Bilder pro Schritt (60 Bilder = 1 Sekunde) */
+#define NLEVEL 5
+static const uint8_t lv_speed[NLEVEL] = { 30, 22, 16, 11, 7 };
+static const char * const lv_name[NLEVEL] = {
+    "STEINZEIT ", "RITTERZEIT", "DAMPFLOK  ", "GAMEBOY   ", "ZUKUNFT   "
+};
+static uint8_t level;
+
 static void snake_hud(void) {
-    gotoxy(0, 0); printf("QUELLEN-SNAKE  %3u", (unsigned)score);
+    gotoxy(0, 0); printf("L%u %s  %3u", (unsigned)(level + 1), lv_name[level], (unsigned)score);
+}
+
+/* Auswahl des Start-Levels. Gibt 0..NLEVEL-1 zurueck. */
+static uint8_t choose_level(void) {
+    uint8_t sel = 0, i, keys;
+    clear_screen();
+    text(3, 1, "QUELLEN-SNAKE");
+    text(1, 3, "WAEHLE DEIN LEVEL:");
+    for (i = 0; i < NLEVEL; i++) {
+        gotoxy(3, 5 + i * 2); printf("%u %s", (unsigned)(i + 1), lv_name[i]);
+    }
+    text(1, 15, "ALLE 5 QUELLEN GEHT");
+    text(1, 16, "ES EIN LEVEL HOEHER");
+    text(1, 17, "START MIT A");
+    wait_release();
+    while (1) {
+        for (i = 0; i < NLEVEL; i++) put(1, 5 + i * 2, sel == i ? T_ARROW : 0);
+        keys = joypad();
+        if ((keys & J_UP) && sel > 0)          { sel--; beep(0x90); wait_frames(10); }
+        if ((keys & J_DOWN) && sel < NLEVEL-1) { sel++; beep(0x90); wait_frames(10); }
+        if (keys & (J_A | J_START)) break;
+        wait_vbl_done();
+    }
+    beep(0xF0);
+    wait_release();
+    return sel;
 }
 
 static void game_snake(void) {
     uint8_t i, x, y, speed, tick = 0, keys;
+    level = choose_level();
     clear_screen();
     for (x = 0; x < 20; x++) { put(x, 2, T_WALL); put(x, 17, T_WALL); }
     for (y = 2; y < 18; y++) { put(0, y, T_WALL); put(19, y, T_WALL); }
@@ -88,7 +123,7 @@ static void game_snake(void) {
     snake_hud();
     text(0, 1, "FRISS DIE QUELLEN!  ");
     place_food();
-    speed = 10;
+    speed = lv_speed[level];
     wait_release();
 
     while (1) {
@@ -124,7 +159,12 @@ static void game_snake(void) {
             score++;
             if (slen < MAXLEN) slen++;
             text(0, 1, food_name[ftype]);
-            if (speed > 4 && (score % 4) == 0) speed--;
+            if ((score % 5) == 0 && level < NLEVEL - 1) {
+                level++;
+                speed = lv_speed[level];
+                text(0, 1, "LEVEL UP!           ");
+                beep(0xE8);
+            }
             snake_hud();
         } else {
             set_bkg_tile_xy(sx[slen - 1], sy[slen - 1], 0);
@@ -139,8 +179,9 @@ static void game_snake(void) {
     wait_frames(40);
     clear_screen();
     text(5, 2, "GAME OVER!");
-    gotoxy(2, 5); printf("DU HAST %u QUELLEN", (unsigned)score);
-    text(2, 6, "GESAMMELT.");
+    gotoxy(2, 4); printf("DU HAST %u QUELLEN", (unsigned)score);
+    text(2, 5, "GESAMMELT.");
+    gotoxy(2, 7); printf("ZEIT: %s", lv_name[level]);
     text(1, 9, "QUELLENARTEN:");
     put(1, 11, T_COIN);   text(3, 11, "SACHQUELLE");
     put(1, 12, T_LETTER); text(3, 12, "SCHRIFTQUELLE");

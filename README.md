@@ -14,7 +14,7 @@ Ein selbst programmiertes Gameboy-Spiel für einen Quellenvortrag im Fach Geschi
 
 ## Die Spiele
 
-- **Quellen-Snake** – frisst Münze, Brief, Kassette und Foto und zeigt die Quellenart.
+- **Quellen-Snake** – frisst Münze, Brief, Kassette und Foto und zeigt die Quellenart. 5 Level von Steinzeit (langsam) bis Zukunft (schnell), alle 5 Quellen ein Level höher.
 - **Batterie-Regen** – Batterien fangen, Hausaufgaben ausweichen.
 - **Zeitreise-Quiz** – 10 Fragen zu Gameboy, Quellen und Schule.
 

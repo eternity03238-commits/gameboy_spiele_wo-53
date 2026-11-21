@@ -8,6 +8,7 @@
 #include <rand.h>
 #include <gbdk/console.h>
 #include "tiles.h"
+#include "font5x7.h"
 
 /* ---------- kleine Helfer ---------- */
 
@@ -306,7 +307,7 @@ static const Question quiz[] = {
       "1989 JAPAN,", "1990 DEUTSCHLAND." },
     { "WIE VIELE BATTERIEN", "BRAUCHT EIN", "GAMEBOY?",
       "2 STUECK", "4 STUECK", 1,
-      "4 x AA. LEER?", "DANN SPIEL VORBEI!" },
+      "4 STUECK AA. LEER?", "DANN SPIEL VORBEI!" },
     { "WAS IST AELTER?", "", "",
       "UNSERE SCHULE", "DER GAMEBOY", 0,
       "WOG GEGRUENDET 1985", "GAMEBOY ERST 1989!" },
@@ -430,7 +431,15 @@ static uint8_t menu(void) {
 
 void main(void) {
     DISPLAY_ON;
-    printf(" ");                     /* Schrift laden */
+    printf(" ");                     /* Standardschrift laden */
+    {   /* Standardschrift durch eigene, schlankere 5x7-Schrift ersetzen */
+        uint8_t c;
+        for (c = FONT_FIRST; c < FONT_FIRST + FONT_COUNT; c++) {
+            gotoxy(0, 0); putchar(c);
+            set_bkg_data(get_bkg_tile_xy(0, 0), 1, &font5x7[(uint16_t)(c - FONT_FIRST) * 16]);
+        }
+        cls();
+    }
     set_bkg_data(TILE_BASE, TILE_COUNT, tiledata);
     set_sprite_data(TILE_BASE, TILE_COUNT, tiledata);
     SHOW_BKG;

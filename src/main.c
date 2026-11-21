@@ -302,19 +302,16 @@ static void game_quiz(void) {
         text(1, 3, q->q1); text(1, 4, q->q2); text(1, 5, q->q3);
         text(2, 9, "A "); text(4, 9, q->a);
         text(2, 11, "B "); text(4, 11, q->b);
-        text(0, 16, "WAEHLEN: OBEN/UNTEN");
-        text(0, 17, "BESTAETIGEN: A");
-        sel = 0;
+        text(0, 16, "DRUECKE DIE TASTE");
+        text(0, 17, "A ODER B!");
         wait_release();
         while (1) {
-            put(1, 9, sel == 0 ? T_ARROW : 0);
-            put(1, 11, sel == 1 ? T_ARROW : 0);
             keys = joypad();
-            if (keys & J_UP) sel = 0;
-            if (keys & J_DOWN) sel = 1;
-            if (keys & (J_A | J_START)) break;
+            if (keys & J_A) { sel = 0; break; }
+            if (keys & J_B) { sel = 1; break; }
             wait_vbl_done();
         }
+        put(1, sel == 0 ? 9 : 11, T_ARROW);
         wait_release();
         text(0, 16, "                    ");
         text(0, 17, "                    ");

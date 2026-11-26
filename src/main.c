@@ -184,11 +184,6 @@ static uint8_t choose(const char *title, const char * const *names, uint8_t n,
     return sel;
 }
 
-static uint8_t pause_game(uint8_t row) {
-    text(0, row, "A: WEITER  B: MENUE ");
-    return (wait_press(J_A | J_B | J_START) & J_B) != 0;
-}
-
 static void game_snake(void) {
     uint8_t i, x, y, speed, tick = 0, keys, eating, growing;
     const char *message = "FRISS DIE QUELLEN!  ";
@@ -217,10 +212,7 @@ static void game_snake(void) {
         else if ((keys & J_LEFT) && dir != 0) ndir = 1;
         else if ((keys & J_UP) && dir != 3) ndir = 2;
         else if ((keys & J_DOWN) && dir != 2) ndir = 3;
-        if (keys & J_START) {
-            if (pause_game(1)) return;
-            text(0, 1, message);
-        }
+        if (keys & J_START) return;
         wait_vbl_done();
         if (++tick < speed) continue;
         tick = 0;
@@ -331,13 +323,7 @@ static void game_rain(void) {
 
     while (lives && energy) {
         keys = joypad();
-        if (keys & J_START) {
-            HIDE_SPRITES;
-            if (pause_game(0)) return;
-            SHOW_SPRITES;
-            text(0, 0, "BATT:     LEBEN:    ");
-            counters_dirty = 1;
-        }
+        if (keys & J_START) return;
         old_px = px;
         if ((keys & J_LEFT) && px > 2) px -= 2;
         if ((keys & J_RIGHT) && px < 142) px += 2;
@@ -484,9 +470,9 @@ static void game_quiz(void) {
         wait_release();
         while (1) {
             keys = joypad();
+            if (keys & J_START) return;
             if (keys & J_A) { sel = 0; break; }
             if (keys & J_B) { sel = 1; break; }
-            if (keys & J_START) { wait_release(); return; }
             wait_vbl_done();
         }
         put(1, sel == 0 ? 9 : 11, T_ARROW);

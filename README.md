@@ -26,7 +26,7 @@ Vier selbst programmierte Spiele für einen Quellenvortrag in Geschichte (Klasse
 | Start | Enter |
 | Select | Umschalttaste |
 
-Auf den Bildschirmtasten lässt sich auch mit Maus oder Touch spielen. Bei Ostwald-Archiv, Snake und Batterie-Regen öffnet **Start** die Pause. **A** setzt fort, **B** führt zurück ins Menü. Im Quiz beantwortet **A/B** die Frage, **Start** führt ins Menü zurück.
+Auf den Bildschirmtasten lässt sich auch mit Maus oder Touch spielen. In allen vier Spielen führt **Start** direkt zum Hauptmenü. Auf der Tastatur übernimmt **Enter** diese Funktion.
 
 ## ROM und Browserfassung neu bauen
 

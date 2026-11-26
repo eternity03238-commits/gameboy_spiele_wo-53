@@ -93,7 +93,7 @@ static void open_room(uint8_t room) {
     text(11, 8, "A DREHEN");
     text(11, 10, "B FALLEN");
     text(11, 14, "START:");
-    text(11, 15, "PAUSE");
+    text(11, 15, "MENUE");
 }
 
 static uint8_t repeat;
@@ -152,12 +152,7 @@ static uint8_t play_room(uint8_t room) {
         keys = joypad();
         pressed = keys & ~prev;
         prev = keys;
-        if (pressed & J_START) {
-            if (pause_game(0)) return 0;
-            text(0, 0, "OSTWALD-ARCHIV      ");
-            prev = 0;
-            continue;
-        }
+        if (pressed & J_START) return 0;
         steer_pair(keys);
         if (pressed & J_A) rotate_pair();
         if (!advance_pair(keys, pressed, room)) { draw_pair(); continue; }
@@ -193,6 +188,6 @@ static void game_archive(void) {
         text(1, 7, "REGAL SORTIERT!");
         text(1, 12, room == 4 ? "MUSEUM EROEFFNET!" : "A: NAECHSTES REGAL");
         text(1, 16, room == 4 ? "A: ZUM MENUE" : "B: ZUM MENUE");
-        if (wait_press(J_A | J_B | J_START) & J_B) return;
+        if (wait_press(J_A | J_B | J_START) & (J_START | J_B)) return;
     }
 }

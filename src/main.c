@@ -4,6 +4,7 @@
  */
 #include <gb/gb.h>
 #include <stdio.h>
+#include <string.h>
 #include <stdint.h>
 #include <rand.h>
 #include <gbdk/console.h>
@@ -90,7 +91,16 @@ static void clear_screen(void) {
 
 static void put(uint8_t x, uint8_t y, uint8_t t) { set_bkg_tile_xy(x, y, t); }
 
-static void text(uint8_t x, uint8_t y, const char *s) { gotoxy(x, y); printf("%s", s); }
+static uint8_t glyph_tile[FONT_COUNT];
+
+/* Direkter Kacheltext vermeidet das automatische Scrollen unten rechts. */
+static void text(uint8_t x, uint8_t y, const char *s) {
+    while (*s && x < 20) {
+        uint8_t c = *s++;
+        if (c < FONT_FIRST || c >= FONT_FIRST + FONT_COUNT) c = '?';
+        put(x++, y, glyph_tile[c - FONT_FIRST]);
+    }
+}
 
 /* ================================================================
  * SPIEL 1: QUELLEN-SNAKE
@@ -98,7 +108,12 @@ static void text(uint8_t x, uint8_t y, const char *s) { gotoxy(x, y); printf("%s
  * ================================================================ */
 
 #define MAXLEN 120
-static uint8_t sx[MAXLEN], sy[MAXLEN];
+static uint8_t sx[MAXLEN], sy[MAXLEN], occupied[18][20];
+static uint8_t head_slot, tail_slot;
+
+static uint8_t next_slot(uint8_t slot) {
+    return slot + 1 == MAXLEN ? 0 : slot + 1;
+}
 static uint8_t slen, dir, ndir, fx, fy, ftype, score, collected;
 
 static const uint8_t food_tile[4] = { T_COIN, T_LETTER, T_CASS, T_FOTO };
@@ -110,17 +125,11 @@ static const char * const food_name[4] = {
 };
 
 /* Spielfeld: x 1..18, y 3..16, Wand drumherum */
-static uint8_t on_snake(uint8_t x, uint8_t y, uint8_t length) {
-    uint8_t i;
-    for (i = 0; i < length; i++) if (sx[i] == x && sy[i] == y) return 1;
-    return 0;
-}
-
 static void place_food(void) {
     do {
         fx = 1 + (rand() % 18);
         fy = 3 + (rand() % 14);
-    } while (on_snake(fx, fy, slen));
+    } while (occupied[fy][fx]);
     ftype = rand() & 3;
     if (collected != 0x0F) {
         while (collected & (1u << ftype)) ftype = (ftype + 1) & 3;
@@ -143,7 +152,7 @@ static void snake_hud(void) {
 /* Auswahl-Bildschirm fuer Level / Schwierigkeit. Gibt 0..n-1 zurueck. */
 static uint8_t choose(const char *title, const char * const *names, uint8_t n,
                       const char *h1, const char *h2) {
-    uint8_t sel = 0, i, keys;
+    uint8_t sel = 0, i, keys, prev = 0, old;
     clear_screen();
     text(3, 1, title);
     text(1, 3, "WAEHLE DEIN LEVEL:");
@@ -153,12 +162,19 @@ static uint8_t choose(const char *title, const char * const *names, uint8_t n,
     text(1, 15, h1);
     text(1, 16, h2);
     text(0, 17, "A: SPIEL  B: ZURUECK");
+    put(1, 5, T_ARROW);
     wait_release();
     while (1) {
-        for (i = 0; i < n; i++) put(1, 5 + i * 2, sel == i ? T_ARROW : 0);
         keys = joypad();
-        if ((keys & J_UP) && sel > 0)     { sel--; play(M_MOVE, 0xA1); wait_frames(10); }
-        if ((keys & J_DOWN) && sel < n-1) { sel++; play(M_MOVE, 0xA1); wait_frames(10); }
+        old = sel;
+        if ((keys & J_UP) && !(prev & J_UP) && sel) sel--;
+        if ((keys & J_DOWN) && !(prev & J_DOWN) && sel + 1 < n) sel++;
+        if (old != sel) {
+            put(1, 5 + old * 2, 0);
+            put(1, 5 + sel * 2, T_ARROW);
+            play(M_MOVE, 0xA1);
+        }
+        prev = keys;
         if (keys & J_B) { wait_release(); return 0xFF; }
         if (keys & (J_A | J_START)) break;
         wait_vbl_done();
@@ -182,7 +198,13 @@ static void game_snake(void) {
     for (x = 0; x < 20; x++) { put(x, 2, T_WALL); put(x, 17, T_WALL); }
     for (y = 2; y < 18; y++) { put(0, y, T_WALL); put(19, y, T_WALL); }
     slen = 3; score = 0; collected = 0; dir = ndir = 0; /* 0=rechts 1=links 2=hoch 3=runter */
-    for (i = 0; i < slen; i++) { sx[i] = 8 - i; sy[i] = 9; put(sx[i], sy[i], i ? T_BODY : T_HEAD); }
+    memset(occupied, 0, sizeof occupied);
+    tail_slot = 0; head_slot = slen - 1;
+    for (i = 0; i < slen; i++) {
+        sx[i] = 6 + i; sy[i] = 9;
+        occupied[9][sx[i]] = 1;
+        put(sx[i], 9, i == head_slot ? T_HEAD : T_BODY);
+    }
     snake_hud();
     text(0, 1, message);
     place_food();
@@ -204,13 +226,13 @@ static void game_snake(void) {
         tick = 0;
         dir = ndir;
 
-        x = sx[0]; y = sy[0];
+        x = sx[head_slot]; y = sy[head_slot];
         if (dir == 0) x++; else if (dir == 1) x--; else if (dir == 2) y--; else y++;
 
         eating = x == fx && y == fy;
         growing = eating && slen < MAXLEN;
         if (x == 0 || x == 19 || y == 2 || y == 17 ||
-            on_snake(x, y, slen - !growing)) {
+            (occupied[y][x] && (growing || x != sx[tail_slot] || y != sy[tail_slot]))) {
             boom();
             play(M_OVER, 0xF4);
             break;
@@ -230,10 +252,14 @@ static void game_snake(void) {
             snake_hud();
         }
         if (growing) slen++;
-        else put(sx[slen - 1], sy[slen - 1], 0);
-        for (i = slen - 1; i > 0; i--) { sx[i] = sx[i - 1]; sy[i] = sy[i - 1]; }
-        sx[0] = x; sy[0] = y;
-        put(sx[1], sy[1], T_BODY);
+        else {
+            occupied[sy[tail_slot]][sx[tail_slot]] = 0;
+            put(sx[tail_slot], sy[tail_slot], 0);
+            tail_slot = next_slot(tail_slot);
+        }
+        put(sx[head_slot], sy[head_slot], T_BODY);
+        head_slot = next_slot(head_slot);
+        sx[head_slot] = x; sy[head_slot] = y; occupied[y][x] = 1;
         put(x, y, T_HEAD);
         if (eating) place_food();
     }
@@ -281,39 +307,21 @@ static const uint8_t rain_drain[3]  = { 16, 11, 8 };
 static const uint8_t rain_hw[3]     = { 6, 4, 3 };
 static const uint8_t rain_lives[3]  = { 5, 3, 3 };
 
-#define DEMO_SECONDS 25
-#define DEMO_TARGET 4
 
-static uint8_t game_rain(uint8_t demo) {
-    static const uint8_t demo_x[] = { 76, 37, 104, 117, 59, 84, 29, 128 };
-    static const uint8_t demo_type[] = { 0, 0, 1, 0, 0, 1, 0, 0 };
+static void game_rain(void) {
     uint8_t px = 72, i, batt = 0, spawn = 0, keys, ftick = 0;
-    uint8_t energy = 100, etick = 0, second_tick = 0, seconds = DEMO_SECONDS;
-    uint8_t demo_item = 0, notice = 0, lost_life = 0, clear_notice = 0;
-    uint8_t hud_dirty = 1;
-    uint8_t d = 0, lives, fdelay, spawnrate;
-    if (!demo) {
-        d = choose("BATTERIE-REGEN", rain_name, 3, "BATTERIEN FANGEN!", "HEFTEN AUSWEICHEN!");
-        if (d == 0xFF) return 0;
-    }
+    uint8_t energy = 100, etick = 0, notice = 0, lost_life = 0;
+    uint8_t counters_dirty = 1, energy_dirty = 1, old_px;
+    uint8_t d = choose("BATTERIE-REGEN", rain_name, 3, "BATTERIEN FANGEN!", "HEFTEN AUSWEICHEN!");
+    uint8_t lives, fdelay, spawnrate;
+    if (d == 0xFF) return;
     lives = rain_lives[d];
-    fdelay = demo ? 2 : rain_fdelay[d];
-    spawnrate = demo ? 100 : rain_spawn[d];
+    fdelay = rain_fdelay[d];
+    spawnrate = rain_spawn[d];
 
     clear_screen();
-    text(1, 2, "BATTERIE-REGEN");
-    text(1, 5, "LINKS/RECHTS");
-    text(1, 6, "BATTERIEN FANGEN");
-    text(1, 7, "HEFTEN AUSWEICHEN");
-    if (demo) {
-        text(1, 10, "ZIEL: 4 BATTERIEN");
-        text(1, 11, "ZEIT: 25 SEKUNDEN");
-    }
-    text(0, 17, "A: SPIEL  B: ZURUECK");
-    if (wait_press(J_A | J_B | J_START) & J_B) return 0;
-
-    clear_screen();
-    if (demo) spawn = spawnrate - 1;
+    text(0, 0, "BATT:     LEBEN:");
+    text(0, 1, "STROM:   %");
     for (i = 0; i < 20; i++) put(i, 17, T_WALL);
     set_sprite_tile(0, T_GB_TL); set_sprite_tile(1, T_GB_TR);
     set_sprite_tile(2, T_GB_BL); set_sprite_tile(3, T_GB_BR);
@@ -321,24 +329,23 @@ static uint8_t game_rain(uint8_t demo) {
     draw_player(px);
     SHOW_SPRITES;
 
-    while (lives && energy && (!demo || (seconds && batt < DEMO_TARGET))) {
+    while (lives && energy) {
         keys = joypad();
         if (keys & J_START) {
             HIDE_SPRITES;
-            if (pause_game(0)) return 0;
+            if (pause_game(0)) return;
             SHOW_SPRITES;
-            hud_dirty = 1;
+            text(0, 0, "BATT:     LEBEN:    ");
+            counters_dirty = 1;
         }
+        old_px = px;
         if ((keys & J_LEFT) && px > 2) px -= 2;
         if ((keys & J_RIGHT) && px < 142) px += 2;
-        draw_player(px);
-
-        if (demo) {
-            if (++second_tick >= 60) { second_tick = 0; seconds--; hud_dirty = 1; }
-        } else if (++etick >= rain_drain[d]) {
+        if (px != old_px) draw_player(px);
+        if (++etick >= rain_drain[d]) {
             etick = 0;
             energy--;
-            hud_dirty = 1;
+            energy_dirty = 1;
         }
 
         if (++spawn >= spawnrate) {
@@ -346,13 +353,9 @@ static uint8_t game_rain(uint8_t demo) {
             for (i = 0; i < NOBJ; i++) if (!oactive[i]) {
                 oactive[i] = 1;
                 oy[i] = 24;
-                if (demo && demo_item < sizeof demo_x) {
-                    ox[i] = demo_x[demo_item];
-                    otype[i] = demo_type[demo_item++];
-                } else {
-                    ox[i] = 4 + (rand() % 148);
-                    otype[i] = (rand() % rain_hw[d]) == 0;
-                }
+                ox[i] = 4 + (rand() % 148);
+                otype[i] = (rand() % rain_hw[d]) == 0;
+                move_sprite(4 + i, ox[i] + 8, oy[i] + 16);
                 set_sprite_tile(4 + i, otype[i] ? T_HOMEW : T_BATT);
                 break;
             }
@@ -363,7 +366,7 @@ static uint8_t game_rain(uint8_t demo) {
             if (ftick == 0) oy[i]++;
             if (oy[i] > 112 && oy[i] < 136 && ox[i] + 8 > px && ox[i] < px + 16) {
                 oactive[i] = 0; move_sprite(4 + i, 0, 0);
-                hud_dirty = 1;
+                counters_dirty = 1;
                 notice = 24;
                 lost_life = otype[i];
                 if (otype[i]) {
@@ -374,7 +377,8 @@ static uint8_t game_rain(uint8_t demo) {
                     if (batt < 255) batt++;
                     play(M_BATT, 0xD2);
                     energy = (energy > 75) ? 100 : energy + 25;
-                    if (!demo && batt < 255 && (batt % 5) == 0) {
+                    energy_dirty = 1;
+                    if (batt < 255 && (batt % 5) == 0) {
                         if (spawnrate > 28) spawnrate = spawnrate >= 34 ? spawnrate - 6 : 28;
                         if (fdelay > 1 && (batt % 10) == 0) {
                             fdelay--;
@@ -384,45 +388,28 @@ static uint8_t game_rain(uint8_t demo) {
                 }
             } else if (oy[i] >= 136) {
                 oactive[i] = 0; move_sprite(4 + i, 0, 0);
-            } else {
+            } else if (!ftick) {
                 move_sprite(4 + i, ox[i] + 8, oy[i] + 16);
             }
         }
 
-        if (hud_dirty) {
-            gotoxy(0, 0);
-            printf("BATT:%3u  LEBEN:%u   ", (unsigned)batt, (unsigned)lives);
-            gotoxy(0, 1);
-            if (demo) printf("ZEIT:%2u", (unsigned)seconds);
-            else {
-                printf("STROM:%3u", (unsigned)energy);
-                putchar('%');
-            }
-            hud_dirty = 0;
+        if (counters_dirty) {
+            gotoxy(5, 0); printf("%3u", (unsigned)batt);
+            gotoxy(16, 0); putchar('0' + lives);
+            counters_dirty = 0;
         }
-        if (notice == 24) {
-            text(12, 1, lost_life ? "-1 LEBEN" : (demo ? "+1 BATT " : "+25 MAX "));
-            clear_notice = 1;
+        if (energy_dirty) {
+            gotoxy(6, 1); printf("%3u", (unsigned)energy);
+            energy_dirty = 0;
         }
-        if (notice) notice--;
-        else if (clear_notice) {
-            text(12, 1, "        ");
-            clear_notice = 0;
-        }
+        if (notice == 24) text(12, 1, lost_life ? "-1 LEBEN" : "+25 MAX ");
+        if (notice && !--notice) text(12, 1, "        ");
         wait_vbl_done();
     }
 
     HIDE_SPRITES;
-    play(demo && batt >= DEMO_TARGET ? M_WIN : M_OVER, 0xD3);
+    play(M_OVER, 0xD3);
     clear_screen();
-    if (demo) {
-        text(1, 2, batt >= DEMO_TARGET ? "VIER BATTERIEN!" : "RUNDE VORBEI!");
-        gotoxy(1, 5); printf("GEFANGEN: %u VON 4", (unsigned)batt);
-        text(1, 8, "DER ORIGINAL-GAME");
-        text(1, 9, "BOY BRAUCHT 4 AA.");
-        text(0, 17, "A: QUIZ  B: MENUE");
-        return (wait_press(J_A | J_B | J_START) & J_B) == 0;
-    }
     if (!energy) {
         text(2, 2, "BATTERIE LEER!");
         text(1, 5, "DER ORIGINAL-GAME");
@@ -435,7 +422,6 @@ static uint8_t game_rain(uint8_t demo) {
     gotoxy(1, 10); printf("BATTERIEN: %u", (unsigned)batt);
     text(1, 17, "A: ZUM MENUE");
     wait_press(J_START | J_A | J_B);
-    return 0;
 }
 
 /* ================================================================
@@ -483,12 +469,11 @@ static const Question quiz[] = {
 };
 #define NQ (sizeof(quiz) / sizeof(quiz[0]))
 
-static void game_quiz(uint8_t demo) {
-    static const uint8_t demo_questions[] = { 3, 8, 9 };
+static void game_quiz(void) {
     uint8_t i, sel, right = 0, keys;
-    uint8_t count = demo ? sizeof demo_questions : NQ;
+    uint8_t count = NQ;
     for (i = 0; i < count; i++) {
-        const Question *q = &quiz[demo ? demo_questions[i] : i];
+        const Question *q = &quiz[i];
         clear_screen();
         gotoxy(0, 0); printf("ZEITREISE-QUIZ %u/%u", (unsigned)(i + 1), (unsigned)count);
         text(1, 3, q->q1); text(1, 4, q->q2); text(1, 5, q->q3);
@@ -538,6 +523,8 @@ static void game_quiz(uint8_t demo) {
  * TITEL UND MENUE
  * ================================================================ */
 
+#include "archive.h"
+
 static void intro(void) {
     uint8_t x, y;
     clear_screen();
@@ -565,7 +552,7 @@ finished:
 
 static uint8_t menu(void) {
     static const char * const games[] = {
-        "VORTRAG", "QUELLEN-SNAKE", "BATTERIE-REGEN", "ZEITREISE-QUIZ"
+        "OSTWALD-ARCHIV", "QUELLEN-SNAKE", "BATTERIE-REGEN", "ZEITREISE-QUIZ"
     };
     uint8_t sel = 0, keys, i, prev = 0;
     clear_screen();
@@ -574,9 +561,10 @@ static uint8_t menu(void) {
     text(2, 4, "OSTWALD EDITION");
     for (i = 0; i < 4; i++) text(3, 8 + i * 2, games[i]);
     text(1, 17, "A: WAEHLEN");
+    put(1, 8, T_ARROW);
     wait_release();
     while (1) {
-        for (i = 0; i < 4; i++) put(1, 8 + i * 2, sel == i ? T_ARROW : 0);
+        i = sel;
         keys = joypad();
         if ((keys & J_UP) && !(prev & J_UP) && sel) {
             sel--;
@@ -585,6 +573,10 @@ static uint8_t menu(void) {
         if ((keys & J_DOWN) && !(prev & J_DOWN) && sel < 3) {
             sel++;
             play(M_MOVE, 0xA1);
+        }
+        if (sel != i) {
+            put(1, 8 + i * 2, 0);
+            put(1, 8 + sel * 2, T_ARROW);
         }
         if (keys & (J_A | J_START)) break;
         prev = keys;
@@ -607,7 +599,8 @@ void main(void) {
         uint8_t c;
         for (c = FONT_FIRST; c < FONT_FIRST + FONT_COUNT; c++) {
             gotoxy(0, 0); putchar(c);
-            set_bkg_data(get_bkg_tile_xy(0, 0), 1, &font5x7[(uint16_t)(c - FONT_FIRST) * 16]);
+            glyph_tile[c - FONT_FIRST] = get_bkg_tile_xy(0, 0);
+            set_bkg_data(glyph_tile[c - FONT_FIRST], 1, &font5x7[(uint16_t)(c - FONT_FIRST) * 16]);
         }
         cls();
     }
@@ -617,9 +610,9 @@ void main(void) {
     intro();
     while (1) {
         uint8_t g = menu();
-        if (g == 0) { if (game_rain(1)) game_quiz(1); }
+        if (g == 0) game_archive();
         else if (g == 1) game_snake();
-        else if (g == 2) game_rain(0);
-        else game_quiz(0);
+        else if (g == 2) game_rain();
+        else game_quiz();
     }
 }

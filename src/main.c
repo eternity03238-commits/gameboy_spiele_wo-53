@@ -11,6 +11,7 @@
 #include "tiles.h"
 #include "font5x7.h"
 #include "logo.h"
+#include "menuart.h"
 
 /* ---------- kleine Helfer ---------- */
 
@@ -102,6 +103,39 @@ static void text(uint8_t x, uint8_t y, const char *s) {
     }
 }
 
+static void text_c(uint8_t y, const char *s) { text((20 - (uint8_t)strlen(s)) / 2, y, s); }
+
+static void clear_row(uint8_t y) { text(0, y, "                    "); }
+
+/* ---------- Pause: liegt im Fenster-Layer ueber dem Spiel ---------- */
+static void wtext(uint8_t x, uint8_t y, const char *s) {
+    while (*s && x < 20) set_win_tile_xy(x++, y, glyph_tile[*s++ - FONT_FIRST]);
+}
+
+static void pause_init(void) {
+    uint8_t i;
+    for (i = 0; i < 20; i++) {
+        set_win_tile_xy(i, 0, T_WALL);
+        set_win_tile_xy(i, 1, glyph_tile[0]);
+        set_win_tile_xy(i, 2, glyph_tile[0]);
+    }
+    wtext(7, 1, "PAUSE");
+    wtext(1, 2, "A: WEITER B: MENUE");
+    move_win(7, 120);
+}
+
+/* Gibt 1 zurueck, wenn ins Menue gewechselt werden soll. */
+static uint8_t pause_game(void) {
+    uint8_t keys, sprites = LCDC_REG & LCDCF_OBJON;
+    HIDE_SPRITES;
+    SHOW_WIN;
+    play(M_MOVE, 0xA1);
+    keys = wait_press(J_A | J_B | J_START);
+    HIDE_WIN;
+    if (sprites) SHOW_SPRITES;
+    return (keys & J_B) ? 1 : 0;
+}
+
 /* ================================================================
  * SPIEL 1: QUELLEN-SNAKE
  * Die Schlange frisst Quellen. Jede Quelle zeigt ihre Quellenart.
@@ -150,12 +184,12 @@ static void snake_hud(void) {
 }
 
 /* Auswahl-Bildschirm fuer Level / Schwierigkeit. Gibt 0..n-1 zurueck. */
-static uint8_t choose(const char *title, const char * const *names, uint8_t n,
-                      const char *h1, const char *h2) {
+static uint8_t choose(const char *title, const char *prompt, const char * const *names,
+                      uint8_t n, const char *h1, const char *h2) {
     uint8_t sel = 0, i, keys, prev = 0, old;
     clear_screen();
-    text(3, 1, title);
-    text(1, 3, "WAEHLE DEIN LEVEL:");
+    text_c(1, title);
+    text(1, 3, prompt);
     for (i = 0; i < n; i++) {
         gotoxy(3, 5 + i * 2); printf("%u %s", (unsigned)(i + 1), names[i]);
     }
@@ -188,7 +222,7 @@ static void game_snake(void) {
     uint8_t i, x, y, speed, tick = 0, keys, eating, growing;
     uint8_t album_notice = 0;
     const char *message = "FUELLE DEIN ALBUM!  ";
-    level = choose("QUELLEN-SNAKE", lv_name, NLEVEL, "ALLE 5 QUELLEN GEHT", "ES EIN LEVEL HOEHER");
+    level = choose("QUELLEN-SNAKE", "WAEHLE DEIN LEVEL:", lv_name, NLEVEL, "ALLE 5 QUELLEN GEHT", "ES EIN LEVEL HOEHER");
     if (level == 0xFF) return;
     clear_screen();
     for (x = 0; x < 20; x++) { put(x, 2, T_WALL); put(x, 17, T_WALL); }
@@ -214,7 +248,7 @@ static void game_snake(void) {
         else if ((keys & J_LEFT) && dir != 0) ndir = 1;
         else if ((keys & J_UP) && dir != 3) ndir = 2;
         else if ((keys & J_DOWN) && dir != 2) ndir = 3;
-        if (keys & J_START) return;
+        if ((keys & J_START) && pause_game()) return;
         wait_vbl_done();
         if (album_notice && !--album_notice) {
             for (i = 1; i < 19; i++) put(i, 17, T_WALL);
@@ -318,7 +352,7 @@ static void game_rain(void) {
     uint8_t energy = 100, etick = 0, notice = 0, lost_life = 0;
     uint8_t counters_dirty = 1, energy_dirty = 1, old_px;
     uint8_t filled_slots = 0, glow = 0;
-    uint8_t d = choose("BATTERIE-REGEN", rain_name, 3, "BATTERIEN FANGEN!", "HEFTEN AUSWEICHEN!");
+    uint8_t d = choose("BATTERIE-REGEN", "WAEHLE DEIN LEVEL:", rain_name, 3, "BATTERIEN FANGEN!", "HEFTEN AUSWEICHEN!");
     uint8_t lives, fdelay, spawnrate;
     if (d == 0xFF) return;
     lives = rain_lives[d];
@@ -338,7 +372,7 @@ static void game_rain(void) {
 
     while (lives && energy) {
         keys = joypad();
-        if (keys & J_START) return;
+        if ((keys & J_START) && pause_game()) return;
         if (glow && !--glow) {
             set_sprite_tile(0, T_GB_TL);
             set_sprite_tile(1, T_GB_TR);
@@ -452,86 +486,118 @@ typedef struct {
 } Question;
 
 static const Question quiz[] = {
-    { "WANN KAM DER", "GAME BOY NACH", "EUROPA?",
-      "1990", "2010", 0,
-      "1989 JAPAN,", "1990 EUROPA." },
-    { "WIE VIELE BATTERIEN", "BRAUCHTE DER", "ORIGINAL-GAME BOY?",
+    { "WANN KAM DER", "GAMEBOY NACH", "EUROPA?",
+      "2010", "1990", 1,
+      "1989 IN JAPAN,", "1990 IN EUROPA." },
+    { "WIE VIELE BATTERIEN", "BRAUCHT EIN", "GAMEBOY?",
       "2 STUECK", "4 STUECK", 1,
       "4 STUECK AA. LEER?", "DANN SPIEL VORBEI!" },
-    { "WAS WAR ZUERST?", "", "",
-      "SPEZIALKLASSEN", "DER GAME BOY", 0,
-      "1985: SPEZ.-KLASSEN", "1989: GAME BOY" },
-    { "DIESER GAME BOY IST", "EINE ...", "",
+    { "WAS IST AELTER?", "", "",
+      "UNSERE SCHULE", "DER GAMEBOY", 0,
+      "WOG GEGRUENDET 1985,", "GAMEBOY ERST 1989!" },
+    { "DIESER GAMEBOY IST", "EINE ...", "",
       "SCHRIFTQUELLE", "SACHQUELLE", 1,
       "EIN GEGENSTAND ZUM", "ANFASSEN = SACHE." },
     { "EIN ALTER BRIEF VON", "OMA IST EINE ...", "",
       "SCHRIFTQUELLE", "BILDQUELLE", 0,
       "TEXT VON FRUEHER", "= SCHRIFTQUELLE." },
-    { "WIE SAH DAS BILD", "BEIM ORIGINAL AUS?", "",
+    { "WELCHE FARBE HATTE", "DER BILDSCHIRM?", "",
       "GRUEN-GRAU", "KNALLBUNT", 0,
-      "KEIN EIGENES LICHT.", "LAMPE HILFT!" },
+      "UND OHNE LICHT!", "NUR UNTER DER LAMPE." },
     { "WILHELM OSTWALD", "BEKAM 1909 DEN ...", "",
       "OSCAR", "NOBELPREIS", 1,
-      "UNSER NAMENSGEBER", "WAR EIN GENIE!" },
+      "FUER CHEMIE. UNSER", "NAMENSGEBER!" },
     { "TETRIS WURDE", "ERFUNDEN IN DER ...", "",
       "SOWJETUNION", "USA", 0,
       "1984 IN MOSKAU.", "" },
-    { "WAS KANNST DU AM", "GERAET ABLESEN?", "",
-      "TASTENNAMEN", "KAUFDATUM", 0,
-      "A UND B STEHEN", "AUF DEM GEHAEUSE." },
-    { "WO FINDEST DU DAS", "KAUFDATUM?", "",
-      "KAUFBELEG", "BATTERIEFACH", 0,
-      "DER KAUFBELEG IST", "EINE SCHRIFTQUELLE." },
+    { "MATHE-FRAGE:", "GAMEBOY 1989,", "HEUTE 2026. ALTER?",
+      "73 JAHRE", "37 JAHRE", 1,
+      "2026 - 1989 = 37.", "GANZ SCHOEN ALT!" },
+    { "WER DIE VERGANGEN-", "HEIT NICHT KENNT,", "...",
+      "VERSTEHT HEUTE NIX", "MUSS NACHSITZEN", 0,
+      "HELMUT KOHL, 1995.", "STEHT AUFM BLATT!" },
 };
 #define NQ (sizeof(quiz) / sizeof(quiz[0]))
 
+static const char * const quiz_mode[2] = { "OHNE ZEITLIMIT", "MIT COUNTDOWN" };
+#define QTIME 15   /* Sekunden pro Frage im Countdown-Modus */
+
+static void tick_click(uint8_t urgent) {
+    if (urgent) play(M_MOVE, 0xC1);
+    else { NR41_REG = 0x3F; NR42_REG = 0x61; NR43_REG = 0x10; NR44_REG = 0x80; }
+}
+
+/* 0 = A, 1 = B, 2 = Zeit um, 0xFF = zurueck ins Menue */
+static uint8_t quiz_wait_answer(uint8_t timed) {
+    uint8_t keys, frames = 0, secs = QTIME;
+    if (timed) { gotoxy(17, 0); printf("%2u", (unsigned)secs); }
+    wait_release();
+    for (;;) {
+        keys = joypad();
+        if (keys & J_START) {
+            if (pause_game()) return 0xFF;
+            wait_release();
+        }
+        if (keys & J_A) return 0;
+        if (keys & J_B) return 1;
+        wait_vbl_done();
+        if (timed && ++frames == 60) {
+            frames = 0;
+            secs--;
+            gotoxy(17, 0); printf("%2u", (unsigned)secs);
+            if (!secs) return 2;
+            tick_click(secs <= 3);
+        }
+    }
+}
+
 static void game_quiz(void) {
-    uint8_t i, sel, right = 0, keys;
-    uint8_t count = NQ;
-    for (i = 0; i < count; i++) {
+    uint8_t i, sel, right = 0, timed, ok, k;
+    timed = choose("ZEITREISE-QUIZ", "SPIELMODUS:", quiz_mode, 2, "COUNTDOWN: 15 SEK.", "PRO FRAGE");
+    if (timed == 0xFF) return;
+    for (i = 0; i < NQ; i++) {
         const Question *q = &quiz[i];
         clear_screen();
-        gotoxy(0, 0); printf("ZEITREISE-QUIZ %u/%u", (unsigned)(i + 1), (unsigned)count);
+        gotoxy(0, 0); printf("FRAGE %u/%u", (unsigned)(i + 1), (unsigned)NQ);
+        for (k = 0; k < 20; k++) put(k, 1, T_WALL);
         text(1, 3, q->q1); text(1, 4, q->q2); text(1, 5, q->q3);
-        text(2, 9, "A "); text(4, 9, q->a);
-        text(2, 11, "B "); text(4, 11, q->b);
-        text(0, 16, "DRUECKE A ODER B");
-        text(0, 17, "START: MENUE");
-        wait_release();
-        while (1) {
-            keys = joypad();
-            if (keys & J_START) return;
-            if (keys & J_A) { sel = 0; break; }
-            if (keys & J_B) { sel = 1; break; }
-            wait_vbl_done();
-        }
-        put(1, sel == 0 ? 9 : 11, T_ARROW);
-        wait_release();
-        text(0, 16, "                    ");
-        text(0, 17, "                    ");
-        if (sel == q->right) {
-            right++; play(M_RIGHT, 0xF2);
-            text(1, 13, "RICHTIG!");
-        } else {
-            play(M_WRONG, 0xF4);
-            text(1, 13, "LEIDER FALSCH!");
-        }
+        text(2, 8, "A  "); text(5, 8, q->a);
+        text(2, 10, "B  "); text(5, 10, q->b);
+        text_c(17, "DRUECKE A ODER B");
+        sel = quiz_wait_answer(timed);
+        if (sel == 0xFF) return;
+        clear_row(17);
+        if (sel < 2) put(1, sel == 0 ? 8 : 10, T_ARROW);
+        ok = sel == q->right;
+        if (ok) { right++; play(M_RIGHT, 0xF2); }
+        else play(M_WRONG, 0xF4);
+        if (!ok) { gotoxy(1, 13); printf("RICHTIG IST: %c", q->right ? 'B' : 'A'); }
         text(1, 14, q->f1);
         text(1, 15, q->f2);
-        text(0, 16, "A: WEITER");
-        text(0, 17, "START: MENUE");
-        if (wait_press(J_A | J_START) & J_START) return;
+        /* Ergebnis blinkt dreimal */
+        for (k = 0; k < 7; k++) {
+            if (k & 1) clear_row(12);
+            else text(1, 12, ok ? "RICHTIG!" : (sel == 2 ? "ZEIT UM!" : "LEIDER FALSCH!"));
+            wait_frames(10);
+        }
+        text_c(17, i + 1 < NQ ? "A: NAECHSTE FRAGE" : "A: ERGEBNIS");
+        for (;;) {
+            k = wait_press(J_A | J_START);
+            if (k & J_A) break;
+            if (pause_game()) return;
+        }
     }
 
     clear_screen();
     play(M_WIN, 0xF2);
-    text(3, 2, "QUIZ GESCHAFFT!");
-    gotoxy(3, 5); printf("%u VON %u RICHTIG", (unsigned)right, (unsigned)count);
-    if (right == count)      { text(1, 8, "TITEL:"); text(1, 9, "GESCHICHTS-PROFI!"); }
-    else if (right * 10 >= count * 7)  { text(1, 8, "TITEL:"); text(1, 9, "ZEITREISENDE(R)"); }
-    else if (right * 10 >= count * 4)  { text(1, 8, "TITEL:"); text(1, 9, "QUELLEN-LEHRLING"); }
-    else                  { text(1, 8, "TITEL:"); text(1, 9, "ZURUECK IN DIE"); text(1, 10, "STEINZEIT! :)"); }
-    text(1, 17, "A: ZUM MENUE");
+    text_c(2, "QUIZ GESCHAFFT!");
+    gotoxy(3, 5); printf("%u VON %u RICHTIG", (unsigned)right, (unsigned)NQ);
+    text_c(8, "DEIN TITEL:");
+    if (right == NQ)     text_c(10, "GESCHICHTS-PROFI!");
+    else if (right >= 7) text_c(10, "ZEITREISENDE(R)");
+    else if (right >= 4) text_c(10, "QUELLEN-LEHRLING");
+    else { text_c(10, "ZURUECK IN DIE"); text_c(11, "STEINZEIT!"); }
+    text_c(17, "A: ZUM MENUE");
     wait_press(J_START | J_A);
 }
 
@@ -539,69 +605,84 @@ static void game_quiz(void) {
  * TITEL UND MENUE
  * ================================================================ */
 
-#include "archive.h"
+#include "sorter.h"
 
+/* Titelbild: bleibt stehen, bis START gedrueckt wird */
 static void intro(void) {
-    uint8_t x, y;
+    uint8_t x, y, blink = 0;
     clear_screen();
     set_bkg_data(LOGO_BASE, LOGO_W * 2, logodata);
     for (y = 0; y < 2; y++)
         for (x = 0; x < LOGO_W; x++)
-            put((20 - LOGO_W) / 2 + x, 7 + y, LOGO_BASE + y * LOGO_W + x);
-    text(2, 10, "OSTWALD EDITION");
-    text(3, 15, "A ODER START");
-    for (y = 48; y > 0; y--) {
-        if (joypad() & (J_A | J_START)) goto finished;
-        SCY_REG = y;
-        wait_vbl_done();
-    }
+            put((20 - LOGO_W) / 2 + x, 5 + y, LOGO_BASE + y * LOGO_W + x);
+    for (y = 72; y > 0; y--) { SCY_REG = y; wait_vbl_done(); }
     SCY_REG = 0;
     play(M_BOOT, 0xD2);
-    for (y = 0; y < 70; y++) {
-        if (joypad() & (J_A | J_START)) break;
+    wait_frames(30);
+    text_c(9, "OSTWALD EDITION");
+    wait_frames(20);
+    text_c(11, "KLASSE 5/3");
+    wait_frames(20);
+    text_c(16, "WOG LEIPZIG");
+    wait_release();
+    for (;;) {
+        if (blink == 0) text_c(14, "DRUECKE START");
+        if (blink == 40) clear_row(14);
+        if (++blink == 70) blink = 0;
+        if (joypad() & (J_START | J_A)) break;
         wait_vbl_done();
     }
-finished:
-    SCY_REG = 0;
+    play(M_SELECT, 0xE2);
     wait_release();
 }
 
+/* Modul-Auswahl: immer ein Spiel pro Bildschirm, links/rechts blaettern */
+#define NGAMES 4
+static const char * const game_name[NGAMES] = {
+    "ZEITREISE-QUIZ", "QUELLEN-SNAKE", "BATTERIE-REGEN", "QUELLEN-SORTIERER"
+};
+static const char * const game_d1[NGAMES] = {
+    "10 FRAGEN -", "SAMMLE ALLE 4", "FANG BATTERIEN,", "3 GLEICHE QUELLEN"
+};
+static const char * const game_d2[NGAMES] = {
+    "RATET ALLE MIT!", "QUELLENARTEN!", "WEICH HEFTEN AUS!", "VERSCHWINDEN!"
+};
+static uint8_t menu_sel;
+
+static void menu_show(uint8_t g) {
+    uint8_t i, ic = ICON_BASE + g * 4;
+    put(9, 7, ic); put(10, 7, ic + 1); put(9, 8, ic + 2); put(10, 8, ic + 3);
+    clear_row(12); clear_row(14); clear_row(15);
+    text_c(12, game_name[g]);
+    text_c(14, game_d1[g]);
+    text_c(15, game_d2[g]);
+    for (i = 0; i < NGAMES; i++) put(8 + i, 17, i == g ? T_DOT_ON : T_DOT_OFF);
+}
+
 static uint8_t menu(void) {
-    static const char * const games[] = {
-        "OSTWALD-ARCHIV", "QUELLEN-SNAKE", "BATTERIE-REGEN", "ZEITREISE-QUIZ"
-    };
-    uint8_t sel = 0, keys, i, prev = 0;
+    uint8_t keys, prev = 0xFF, pressed, x, y;
     clear_screen();
-    for (i = 0; i < 20; i++) { put(i, 0, T_WALL); put(i, 6, T_WALL); }
-    text(6, 2, "GAMEBOY");
-    text(2, 4, "OSTWALD EDITION");
-    for (i = 0; i < 4; i++) text(3, 8 + i * 2, games[i]);
-    text(1, 17, "A: WAEHLEN");
-    put(1, 8, T_ARROW);
-    wait_release();
-    while (1) {
-        i = sel;
-        keys = joypad();
-        if ((keys & J_UP) && !(prev & J_UP) && sel) {
-            sel--;
-            play(M_MOVE, 0xA1);
-        }
-        if ((keys & J_DOWN) && !(prev & J_DOWN) && sel < 3) {
-            sel++;
-            play(M_MOVE, 0xA1);
-        }
-        if (sel != i) {
-            put(1, 8 + i * 2, 0);
-            put(1, 8 + sel * 2, T_ARROW);
-        }
-        if (keys & (J_A | J_START)) break;
-        prev = keys;
+    set_bkg_data(ART_BASE, ART_COUNT, artdata);
+    text_c(1, "OSTWALD EDITION");
+    for (y = 0; y < CART_H; y++)
+        for (x = 0; x < CART_W; x++)
+            put(7 + x, 5 + y, cart_map[y * CART_W + x]);
+    put(3, 8, T_LARROW);
+    put(16, 8, T_RARROW);
+    menu_show(menu_sel);
+    for (;;) {
         wait_vbl_done();
+        keys = joypad();
+        pressed = keys & ~prev;
+        prev = keys;
+        if (pressed & J_LEFT)  { menu_sel = menu_sel ? menu_sel - 1 : NGAMES - 1; play(M_MOVE, 0xA1); menu_show(menu_sel); }
+        if (pressed & J_RIGHT) { menu_sel = menu_sel + 1 < NGAMES ? menu_sel + 1 : 0; play(M_MOVE, 0xA1); menu_show(menu_sel); }
+        if (pressed & (J_A | J_START)) break;
     }
-    initrand(DIV_REG | ((uint16_t)sel << 8));
+    initrand(DIV_REG | ((uint16_t)menu_sel << 8));
     play(M_SELECT, 0xE2);
     wait_release();
-    return sel;
+    return menu_sel;
 }
 
 void main(void) {
@@ -623,12 +704,13 @@ void main(void) {
     set_bkg_data(TILE_BASE, TILE_COUNT, tiledata);
     set_sprite_data(TILE_BASE, TILE_COUNT, tiledata);
     SHOW_BKG;
+    pause_init();
     intro();
     while (1) {
         uint8_t g = menu();
-        if (g == 0) game_archive();
+        if (g == 0) game_quiz();
         else if (g == 1) game_snake();
         else if (g == 2) game_rain();
-        else game_quiz();
+        else game_sort();
     }
 }

@@ -152,7 +152,7 @@ static uint8_t slen, dir, ndir, fx, fy, ftype, score, collected;
 
 static const uint8_t food_tile[4] = { T_COIN, T_LETTER, T_CASS, T_FOTO };
 static const char * const food_name[4] = {
-    "MUENZE=SACHQUELLE   ",
+    "MUENZE=GEGENSTAENDL.",
     "BRIEF=SCHRIFTQUELLE ",
     "KASSETTE=TONQUELLE  ",
     "FOTO=BILDQUELLE     "
@@ -481,41 +481,41 @@ static void game_rain(void) {
 typedef struct {
     const char *q1, *q2, *q3;
     const char *a, *b;
-    uint8_t right;         /* 0 = A, 1 = B */
-    const char *f1, *f2;   /* Fakt nach der Antwort */
+    uint8_t right;             /* 0 = A, 1 = B */
+    const char *f1, *f2, *f3;  /* Fakt nach der Antwort */
 } Question;
 
 static const Question quiz[] = {
     { "WANN KAM DER", "GAMEBOY NACH", "EUROPA?",
       "2010", "1990", 1,
-      "1989 IN JAPAN,", "1990 IN EUROPA." },
+      "1989 IN JAPAN,", "1990 IN EUROPA.", "" },
     { "WIE VIELE BATTERIEN", "BRAUCHT EIN", "GAMEBOY?",
       "2 STUECK", "4 STUECK", 1,
-      "4 STUECK AA. LEER?", "DANN SPIEL VORBEI!" },
+      "4 STUECK AA. LEER?", "DANN SPIEL VORBEI!", "" },
     { "WAS IST AELTER?", "", "",
       "UNSERE SCHULE", "DER GAMEBOY", 0,
-      "WOG GEGRUENDET 1985,", "GAMEBOY ERST 1989!" },
-    { "DIESER GAMEBOY IST", "EINE ...", "",
-      "SCHRIFTQUELLE", "SACHQUELLE", 1,
-      "EIN GEGENSTAND ZUM", "ANFASSEN = SACHE." },
+      "SCHULE: SEIT 1985,", "GAMEBOY: SEIT 1989!", "" },
+    { "DIESER GAMEBOY IST", "WELCHE QUELLENART?", "",
+      "SCHRIFTLICHE", "GEGENSTAENDLICHE", 1,
+      "EIN GEGENSTAND ZUM", "ANFASSEN = GEGEN-", "STAENDLICHE QUELLE." },
     { "EIN ALTER BRIEF VON", "OMA IST EINE ...", "",
       "SCHRIFTQUELLE", "BILDQUELLE", 0,
-      "TEXT VON FRUEHER", "= SCHRIFTQUELLE." },
+      "TEXT VON FRUEHER", "= SCHRIFTQUELLE.", "" },
     { "WELCHE FARBE HATTE", "DER BILDSCHIRM?", "",
       "GRUEN-GRAU", "KNALLBUNT", 0,
-      "UND OHNE LICHT!", "NUR UNTER DER LAMPE." },
+      "UND OHNE LICHT!", "NUR MIT LAMPE.", "" },
     { "WILHELM OSTWALD", "BEKAM 1909 DEN ...", "",
       "OSCAR", "NOBELPREIS", 1,
-      "FUER CHEMIE. UNSER", "NAMENSGEBER!" },
+      "FUER CHEMIE. UNSER", "NAMENSGEBER!", "" },
     { "TETRIS WURDE", "ERFUNDEN IN DER ...", "",
       "SOWJETUNION", "USA", 0,
-      "1984 IN MOSKAU.", "" },
-    { "MATHE-FRAGE:", "GAMEBOY 1989,", "HEUTE 2026. ALTER?",
-      "73 JAHRE", "37 JAHRE", 1,
-      "2026 - 1989 = 37.", "GANZ SCHOEN ALT!" },
-    { "WER DIE VERGANGEN-", "HEIT NICHT KENNT,", "...",
-      "VERSTEHT HEUTE NIX", "MUSS NACHSITZEN", 0,
-      "HELMUT KOHL, 1995.", "STEHT AUFM BLATT!" },
+      "1984 IN MOSKAU.", "", "" },
+    { "27 GAMEBOYS, JEDER", "BRAUCHT 4 BATTERIEN", "WIE VIELE ZUSAMMEN?",
+      "98", "108", 1,
+      "27 MAL 4 = 108.", "TRICK: 25 MAL 4=100", "PLUS 2 MAL 4 = 8." },
+    { "WER DIE VERGANGEN-", "HEIT NICHT KENNT,", "KANN DIE GEGENWART",
+      "NICHT VERSTEHEN", "BESSER VERSTEHEN", 0,
+      "...UND DIE ZUKUNFT", "NICHT GESTALTEN.", "HELMUT KOHL, 1995" },
 };
 #define NQ (sizeof(quiz) / sizeof(quiz[0]))
 
@@ -558,26 +558,26 @@ static void game_quiz(void) {
     for (i = 0; i < NQ; i++) {
         const Question *q = &quiz[i];
         clear_screen();
-        gotoxy(0, 0); printf("FRAGE %u/%u", (unsigned)(i + 1), (unsigned)NQ);
-        for (k = 0; k < 20; k++) put(k, 1, T_WALL);
-        text(1, 3, q->q1); text(1, 4, q->q2); text(1, 5, q->q3);
-        text(2, 8, "A  "); text(5, 8, q->a);
-        text(2, 10, "B  "); text(5, 10, q->b);
+        gotoxy(1, 0); printf("FRAGE %u/%u", (unsigned)(i + 1), (unsigned)NQ);
+        text(1, 2, q->q1); text(1, 3, q->q2); text(1, 4, q->q3);
+        text(2, 7, "A"); text(4, 7, q->a);
+        text(2, 9, "B"); text(4, 9, q->b);
         text_c(17, "DRUECKE A ODER B");
         sel = quiz_wait_answer(timed);
         if (sel == 0xFF) return;
         clear_row(17);
-        if (sel < 2) put(1, sel == 0 ? 8 : 10, T_ARROW);
+        if (sel < 2) put(0, sel == 0 ? 7 : 9, T_ARROW);
         ok = sel == q->right;
         if (ok) { right++; play(M_RIGHT, 0xF2); }
         else play(M_WRONG, 0xF4);
-        if (!ok) { gotoxy(1, 13); printf("RICHTIG IST: %c", q->right ? 'B' : 'A'); }
-        text(1, 14, q->f1);
-        text(1, 15, q->f2);
+        if (!ok) { gotoxy(1, 12); printf("RICHTIG IST: %c", q->right ? 'B' : 'A'); }
+        text(1, 13, q->f1);
+        text(1, 14, q->f2);
+        text(1, 15, q->f3);
         /* Ergebnis blinkt dreimal */
         for (k = 0; k < 7; k++) {
-            if (k & 1) clear_row(12);
-            else text(1, 12, ok ? "RICHTIG!" : (sel == 2 ? "ZEIT UM!" : "LEIDER FALSCH!"));
+            if (k & 1) clear_row(11);
+            else text(1, 11, ok ? "RICHTIG!" : (sel == 2 ? "ZEIT UM!" : "LEIDER FALSCH!"));
             wait_frames(10);
         }
         text_c(17, i + 1 < NQ ? "A: NAECHSTE FRAGE" : "A: ERGEBNIS");
@@ -651,7 +651,7 @@ static uint8_t menu_sel;
 
 static void menu_show(uint8_t g) {
     uint8_t i, ic = ICON_BASE + g * 4;
-    put(9, 7, ic); put(10, 7, ic + 1); put(9, 8, ic + 2); put(10, 8, ic + 3);
+    put(9, 5, ic); put(10, 5, ic + 1); put(9, 6, ic + 2); put(10, 6, ic + 3);
     clear_row(12); clear_row(14); clear_row(15);
     text_c(12, game_name[g]);
     text_c(14, game_d1[g]);
@@ -666,9 +666,9 @@ static uint8_t menu(void) {
     text_c(1, "OSTWALD EDITION");
     for (y = 0; y < CART_H; y++)
         for (x = 0; x < CART_W; x++)
-            put(7 + x, 5 + y, cart_map[y * CART_W + x]);
-    put(3, 8, T_LARROW);
-    put(16, 8, T_RARROW);
+            put(7 + x, 3 + y, cart_map[y * CART_W + x]);
+    put(3, 6, T_LARROW);
+    put(16, 6, T_RARROW);
     menu_show(menu_sel);
     for (;;) {
         wait_vbl_done();

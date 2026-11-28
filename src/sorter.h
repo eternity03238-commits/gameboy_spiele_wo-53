@@ -19,7 +19,7 @@ static const uint8_t s_start_level[3] = { 0, 2, 4 };
 /* Fallgeschwindigkeit in 1/16 Pixel pro Bild; 128 = ein Feld */
 static const uint8_t s_rate[9] = { 2, 3, 4, 5, 6, 8, 10, 12, 15 };
 static const char * const s_plural[4] = {
-    "SACHQUELLEN!", "SCHRIFTQUELLEN!", "TONQUELLEN!", "BILDQUELLEN!"
+    "GEGENSTAENDLICHE!", "SCHRIFTQUELLEN!", "TONQUELLEN!", "BILDQUELLEN!"
 };
 /* Lage des zweiten Teils: 0 rechts, 1 unten, 2 links, 3 oben */
 static const int8_t s_dx[4] = { 1, 0, -1, 0 };
@@ -143,7 +143,8 @@ static void s_land(void) {
 }
 
 static void game_sort(void) {
-    uint8_t d, x, y, keys, prev = 0, pressed, speed;
+    uint8_t d, x, y, keys, prev = 0, pressed, speed, lock = 0, rep = 0;
+    int8_t dir;
     d = choose("QUELLEN-SORTIERER", "WIE SCHNELL?", s_speed_name, 3,
                "3 GLEICHE QUELLEN", "VERSCHWINDEN!");
     if (d == 0xFF) return;
@@ -170,12 +171,21 @@ static void game_sort(void) {
         pressed = keys & ~prev;
         prev = keys;
         if ((pressed & J_START) && pause_game()) return;
-        if ((pressed & J_LEFT)  && s_fits(s_x - 1, s_y, s_o) && (!s_sub || s_fits(s_x - 1, s_y + 1, s_o))) s_x--;
-        if ((pressed & J_RIGHT) && s_fits(s_x + 1, s_y, s_o) && (!s_sub || s_fits(s_x + 1, s_y + 1, s_o))) s_x++;
-        if (pressed & J_A) {
+        /* Links/rechts: einmal tippen = ein Feld, gedrueckt halten = weiterrutschen */
+        dir = (keys & J_LEFT) ? -1 : ((keys & J_RIGHT) ? 1 : 0);
+        if (!dir) rep = 0;
+        else if (pressed & (J_LEFT | J_RIGHT)) rep = 14;
+        else if (rep > 1) { rep--; dir = 0; }
+        else rep = 5;
+        if (dir && s_fits(s_x + dir, s_y, s_o) && (!s_sub || s_fits(s_x + dir, s_y + 1, s_o))) {
+            s_x += dir; lock = 0;
+        }
+        /* Drehen mit A oder mit Pfeil nach oben */
+        if (pressed & (J_A | J_UP)) {
             uint8_t oo = s_o, ox_ = s_x;
             s_rotate();
             if (s_sub && !s_fits(s_x, s_y + 1, s_o)) { s_o = oo; s_x = ox_; }
+            else if (s_o != oo) { play(M_MOVE, 0x81); lock = 0; }
         }
         if (pressed & J_B) {
             while (s_fits(s_x, s_y + 1, s_o)) s_y++;
@@ -188,8 +198,11 @@ static void game_sort(void) {
             s_draw_piece();
             continue;
         }
-        /* gelandet */
-        if (s_sub) { s_sub = 0; s_draw_piece(); continue; }
+        /* unten angekommen: kurze Zeit zum Drehen und Schieben, dann liegt es fest */
+        if (s_sub) { s_sub = 0; }
+        s_draw_piece();
+        if (!(pressed & J_B) && ++lock < 30) continue;
+        lock = 0;
         s_land();
         text(0, 1, "                    ");
         text(0, 2, "          ");

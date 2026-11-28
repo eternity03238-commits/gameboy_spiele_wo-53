@@ -15,10 +15,10 @@ Das Titelbild bleibt stehen, bis jemand **Start** drückt. Im Menü steht immer 
 
 ## Die Spiele
 
-- **Zeitreise-Quiz** stellt zehn A/B-Fragen zu Game Boy, Quellenarten, Wilhelm Ostwald und Schule, mit einer Rechenfrage und dem Kohl-Zitat vom Arbeitsblatt. Antwort A mit Taste A, Antwort B mit Taste B. Wahlweise mit 15-Sekunden-Countdown pro Frage.
+- **Zeitreise-Quiz** stellt zehn A/B-Fragen zu Game Boy, Quellenarten (der Game Boy ist eine gegenständliche Quelle), Wilhelm Ostwald und Schule, mit einer Rechenfrage und dem vollständigen Kohl-Zitat vom Arbeitsblatt. Antwort A mit Taste A, Antwort B mit Taste B. Wahlweise mit 15-Sekunden-Countdown pro Frage.
 - **Quellen-Snake** sammelt Münze, Brief, Kassette und Foto. Das Sammelalbum am oberen Rand zeigt jeden neuen Fund. Fünf Level von Steinzeit bis Zukunft.
 - **Batterie-Regen** lässt den Game Boy Batterien fangen und Heften ausweichen. Drei Schwierigkeitsstufen.
-- **Quellen-Sortierer** lässt Quellenpaare ins Regal fallen. Drei gleiche Quellenarten nebeneinander oder übereinander verschwinden. Vorschau auf das nächste Paar, drei Startgeschwindigkeiten.
+- **Quellen-Sortierer** lässt Quellenpaare ins Regal fallen. Drei gleiche Quellenarten nebeneinander oder übereinander verschwinden. Drehen mit A oder Pfeil nach oben. Unten angekommen bleibt kurz Zeit zum Drehen und Schieben. Vorschau auf das nächste Paar, drei Startgeschwindigkeiten.
 
 ## Steuerung
 

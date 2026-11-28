@@ -519,7 +519,12 @@ static const Question quiz[] = {
 };
 #define NQ (sizeof(quiz) / sizeof(quiz[0]))
 
-static const char * const quiz_mode[2] = { "OHNE ZEITLIMIT", "MIT COUNTDOWN" };
+/* Auswahl: Anzahl der Fragen und Countdown */
+static const char * const quiz_mode[4] = {
+    "KURZ: 5 FRAGEN", "KURZ+COUNTDOWN", "LANG: 10 FRAGEN", "LANG+COUNTDOWN"
+};
+/* Kurzfassung: Gameboy als Quelle, Schule, Ostwald, Mathe, Kohl-Zitat */
+static const uint8_t quiz_short[5] = { 3, 2, 6, 8, 9 };
 #define QTIME 15   /* Sekunden pro Frage im Countdown-Modus */
 
 static void tick_click(uint8_t urgent) {
@@ -553,12 +558,15 @@ static uint8_t quiz_wait_answer(uint8_t timed) {
 
 static void game_quiz(void) {
     uint8_t i, sel, right = 0, timed, ok, k;
-    timed = choose("ZEITREISE-QUIZ", "SPIELMODUS:", quiz_mode, 2, "COUNTDOWN: 15 SEK.", "PRO FRAGE");
-    if (timed == 0xFF) return;
-    for (i = 0; i < NQ; i++) {
-        const Question *q = &quiz[i];
+    uint8_t mode, count;
+    mode = choose("ZEITREISE-QUIZ", "SPIELMODUS:", quiz_mode, 4, "COUNTDOWN: 15 SEK.", "PRO FRAGE");
+    if (mode == 0xFF) return;
+    timed = mode & 1;
+    count = mode < 2 ? 5 : NQ;
+    for (i = 0; i < count; i++) {
+        const Question *q = &quiz[count == 5 ? quiz_short[i] : i];
         clear_screen();
-        gotoxy(1, 0); printf("FRAGE %u/%u", (unsigned)(i + 1), (unsigned)NQ);
+        gotoxy(1, 0); printf("FRAGE %u/%u", (unsigned)(i + 1), (unsigned)count);
         text(1, 2, q->q1); text(1, 3, q->q2); text(1, 4, q->q3);
         text(2, 7, "A"); text(4, 7, q->a);
         text(2, 9, "B"); text(4, 9, q->b);
@@ -580,7 +588,7 @@ static void game_quiz(void) {
             else text(1, 11, ok ? "RICHTIG!" : (sel == 2 ? "ZEIT UM!" : "LEIDER FALSCH!"));
             wait_frames(10);
         }
-        text_c(17, i + 1 < NQ ? "A: NAECHSTE FRAGE" : "A: ERGEBNIS");
+        text_c(17, i + 1 < count ? "A: NAECHSTE FRAGE" : "A: ERGEBNIS");
         for (;;) {
             k = wait_press(J_A | J_START);
             if (k & J_A) break;
@@ -591,11 +599,11 @@ static void game_quiz(void) {
     clear_screen();
     play(M_WIN, 0xF2);
     text_c(2, "QUIZ GESCHAFFT!");
-    gotoxy(3, 5); printf("%u VON %u RICHTIG", (unsigned)right, (unsigned)NQ);
+    gotoxy(3, 5); printf("%u VON %u RICHTIG", (unsigned)right, (unsigned)count);
     text_c(8, "DEIN TITEL:");
-    if (right == NQ)     text_c(10, "GESCHICHTS-PROFI!");
-    else if (right >= 7) text_c(10, "ZEITREISENDE(R)");
-    else if (right >= 4) text_c(10, "QUELLEN-LEHRLING");
+    if (right == count)              text_c(10, "GESCHICHTS-PROFI!");
+    else if (right * 10 >= count * 7) text_c(10, "ZEITREISENDE(R)");
+    else if (right * 10 >= count * 4) text_c(10, "QUELLEN-LEHRLING");
     else { text_c(10, "ZURUECK IN DIE"); text_c(11, "STEINZEIT!"); }
     text_c(17, "A: ZUM MENUE");
     wait_press(J_START | J_A);

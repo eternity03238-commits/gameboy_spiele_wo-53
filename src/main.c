@@ -511,7 +511,7 @@ static const Question quiz[] = {
       "SOWJETUNION", "USA", 0,
       "1984 IN MOSKAU.", "", "" },
     { "27 GAMEBOYS, JEDER", "BRAUCHT 4 BATTERIEN", "WIE VIELE ZUSAMMEN?",
-      "98", "108", 1,
+      "112", "108", 1,
       "27 MAL 4 = 108.", "TRICK: 25 MAL 4=100", "PLUS 2 MAL 4 = 8." },
     { "WER DIE VERGANGEN-", "HEIT NICHT KENNT,", "KANN DIE GEGENWART",
       "NICHT VERSTEHEN", "BESSER VERSTEHEN", 0,

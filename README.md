@@ -12,8 +12,8 @@ Vier selbst programmierte Spiele für einen Quellenvortrag in Geschichte (Klasse
 ## Die Spiele
 
 - **Ostwald-Archiv** führt durch fünf Regale. Quellenpaare füllen die Lücken. Volle Reihen verschwinden. Mit jedem Level steigt das Tempo. Links/rechts verschiebt, A dreht, unten beschleunigt und B lässt das Paar sofort fallen.
-- **Quellen-Snake** sammelt Münze, Brief, Kassette und Foto. Die ersten vier Funde sind verschieden. Alle fünf Funde steigt die Geschwindigkeit bis zur höchsten Stufe.
-- **Batterie-Regen** lässt den Game Boy Batterien fangen und Heften ausweichen. Die freie Runde hat drei Schwierigkeitsstufen.
+- **Quellen-Snake** sammelt Münze, Brief, Kassette und Foto. Das Sammelalbum am oberen Rand zeigt jeden neuen Fund. Nach den ersten vier verschiedenen Quellen erscheint „Sammlung komplett!“. Alle fünf Funde steigt die Geschwindigkeit bis zur höchsten Stufe.
+- **Batterie-Regen** lässt den Game Boy Batterien fangen und Heften ausweichen. Die Runde hat drei Schwierigkeitsstufen. Jeder Fang füllt einen der vier Batterieplätze. Beim vierten Fang leuchtet der kleine Game Boy kurz auf.
 - **Zeitreise-Quiz** umfasst zehn A/B-Fragen zu Game Boy, historischen Quellen und Schule.
 
 ## Steuerung

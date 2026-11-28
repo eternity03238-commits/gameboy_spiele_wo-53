@@ -146,7 +146,7 @@ static const char * const lv_name[NLEVEL] = {
 static uint8_t level;
 
 static void snake_hud(void) {
-    gotoxy(0, 0); printf("L%u %s  %3u", (unsigned)(level + 1), lv_name[level], (unsigned)score);
+    gotoxy(0, 0); printf("L%u %s%3u", (unsigned)(level + 1), lv_name[level], (unsigned)score);
 }
 
 /* Auswahl-Bildschirm fuer Level / Schwierigkeit. Gibt 0..n-1 zurueck. */
@@ -186,7 +186,8 @@ static uint8_t choose(const char *title, const char * const *names, uint8_t n,
 
 static void game_snake(void) {
     uint8_t i, x, y, speed, tick = 0, keys, eating, growing;
-    const char *message = "FRISS DIE QUELLEN!  ";
+    uint8_t album_notice = 0;
+    const char *message = "FUELLE DEIN ALBUM!  ";
     level = choose("QUELLEN-SNAKE", lv_name, NLEVEL, "ALLE 5 QUELLEN GEHT", "ES EIN LEVEL HOEHER");
     if (level == 0xFF) return;
     clear_screen();
@@ -201,6 +202,7 @@ static void game_snake(void) {
         put(sx[i], 9, i == head_slot ? T_HEAD : T_BODY);
     }
     snake_hud();
+    for (i = 0; i < 4; i++) put(16 + i, 0, T_GHOST_COIN + i);
     text(0, 1, message);
     place_food();
     speed = lv_speed[level];
@@ -214,6 +216,9 @@ static void game_snake(void) {
         else if ((keys & J_DOWN) && dir != 2) ndir = 3;
         if (keys & J_START) return;
         wait_vbl_done();
+        if (album_notice && !--album_notice) {
+            for (i = 1; i < 19; i++) put(i, 17, T_WALL);
+        }
         if (++tick < speed) continue;
         tick = 0;
         dir = ndir;
@@ -231,8 +236,16 @@ static void game_snake(void) {
         }
 
         if (eating) {
-            collected |= 1u << ftype;
             play(M_COIN, 0xF2);
+            if (!(collected & (1u << ftype))) {
+                collected |= 1u << ftype;
+                put(16 + ftype, 0, food_tile[ftype]);
+                if (collected == 0x0F) {
+                    text(1, 17, "SAMMLUNG KOMPLETT!");
+                    album_notice = 90;
+                    play(M_WIN, 0xC2);
+                }
+            }
             score++;
             message = food_name[ftype];
             text(0, 1, message);
@@ -262,7 +275,7 @@ static void game_snake(void) {
     gotoxy(2, 4); printf("DU HAST %u QUELLEN", (unsigned)score);
     text(2, 5, "GESAMMELT.");
     gotoxy(2, 7); printf("ZEIT: %s", lv_name[level]);
-    text(1, 9, "DEINE QUELLEN:");
+    text(1, 9, collected == 0x0F ? "SAMMLUNG KOMPLETT!" : "DEINE QUELLEN:");
     if (!collected) text(1, 11, "NOCH KEINE.");
     y = 11;
     for (i = 0; i < 4; i++) {
@@ -304,6 +317,7 @@ static void game_rain(void) {
     uint8_t px = 72, i, batt = 0, spawn = 0, keys, ftick = 0;
     uint8_t energy = 100, etick = 0, notice = 0, lost_life = 0;
     uint8_t counters_dirty = 1, energy_dirty = 1, old_px;
+    uint8_t filled_slots = 0, glow = 0;
     uint8_t d = choose("BATTERIE-REGEN", rain_name, 3, "BATTERIEN FANGEN!", "HEFTEN AUSWEICHEN!");
     uint8_t lives, fdelay, spawnrate;
     if (d == 0xFF) return;
@@ -312,7 +326,8 @@ static void game_rain(void) {
     spawnrate = rain_spawn[d];
 
     clear_screen();
-    text(0, 0, "BATT:     LEBEN:");
+    text(0, 0, "BATT:        LEBEN:");
+    for (i = 0; i < 4; i++) put(8 + i, 0, T_BATT_EMPTY);
     text(0, 1, "STROM:   %");
     for (i = 0; i < 20; i++) put(i, 17, T_WALL);
     set_sprite_tile(0, T_GB_TL); set_sprite_tile(1, T_GB_TR);
@@ -324,6 +339,10 @@ static void game_rain(void) {
     while (lives && energy) {
         keys = joypad();
         if (keys & J_START) return;
+        if (glow && !--glow) {
+            set_sprite_tile(0, T_GB_TL);
+            set_sprite_tile(1, T_GB_TR);
+        }
         old_px = px;
         if ((keys & J_LEFT) && px > 2) px -= 2;
         if ((keys & J_RIGHT) && px < 142) px += 2;
@@ -362,6 +381,17 @@ static void game_rain(void) {
                 } else {
                     if (batt < 255) batt++;
                     play(M_BATT, 0xD2);
+                    if (filled_slots == 4) {
+                        uint8_t slot;
+                        for (slot = 0; slot < 4; slot++) put(8 + slot, 0, T_BATT_EMPTY);
+                        filled_slots = 0;
+                    }
+                    put(8 + filled_slots, 0, T_BATT);
+                    if (++filled_slots == 4) {
+                        set_sprite_tile(0, T_GB_TL_LIT);
+                        set_sprite_tile(1, T_GB_TR_LIT);
+                        glow = 36;
+                    }
                     energy = (energy > 75) ? 100 : energy + 25;
                     energy_dirty = 1;
                     if (batt < 255 && (batt % 5) == 0) {
@@ -381,7 +411,7 @@ static void game_rain(void) {
 
         if (counters_dirty) {
             gotoxy(5, 0); printf("%3u", (unsigned)batt);
-            gotoxy(16, 0); putchar('0' + lives);
+            gotoxy(19, 0); putchar('0' + lives);
             counters_dirty = 0;
         }
         if (energy_dirty) {
